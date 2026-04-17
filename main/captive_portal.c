@@ -119,9 +119,9 @@ static const char PORTAL_HTML[] =
     "<select name='ssid' id='ssid'><option>Scanning...</option></select>"
     "<label>WiFi Password</label>"
     "<input type='password' name='pass' id='pass' placeholder='WiFi password'>"
-    "<label>Webhook URL</label>"
-    "<input type='text' name='webhook_url' id='webhook_url' "
-    "value='" CONFIG_DEFAULT_WEBHOOK_URL "'>"
+    "<label>Server (IP:Port)</label>"
+    "<input type='text' name='server_addr' id='server_addr' "
+    "value='" CONFIG_DEFAULT_SERVER "'>"
     "<button type='submit' id='btn'>Save &amp; Connect</button>"
     "</form>"
     "<div class='status' id='st'></div>"
@@ -135,7 +135,7 @@ static const char PORTAL_HTML[] =
     "e.preventDefault();let b=document.getElementById('btn');b.disabled=true;b.textContent='Saving...';"
     "let body='ssid='+encodeURIComponent(document.getElementById('ssid').value)"
     "+'&pass='+encodeURIComponent(document.getElementById('pass').value)"
-    "+'&webhook_url='+encodeURIComponent(document.getElementById('webhook_url').value);"
+    "+'&server_addr='+encodeURIComponent(document.getElementById('server_addr').value);"
     "fetch('/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},"
     "body:body}).then(r=>r.text()).then(t=>{document.getElementById('st').textContent=t;});"
     "};"
@@ -237,11 +237,11 @@ static esp_err_t handle_save(httpd_req_t *req)
     }
     body[len] = 0;
 
-    char ssid[33] = {0}, pass[65] = {0}, webhook_url[256] = {0};
+    char ssid[33] = {0}, pass[65] = {0}, server_addr[256] = {0};
 
     parse_field(body, "ssid", ssid, sizeof(ssid));
     parse_field(body, "pass", pass, sizeof(pass));
-    parse_field(body, "webhook_url", webhook_url, sizeof(webhook_url));
+    parse_field(body, "server_addr", server_addr, sizeof(server_addr));
 
     if (strlen(ssid) == 0) {
         return httpd_resp_send(req, "Please select a network", HTTPD_RESP_USE_STRLEN);
@@ -252,9 +252,9 @@ static esp_err_t handle_save(httpd_req_t *req)
     ESP_LOGI(TAG, "WiFi saved: %s", ssid);
 
     /* Save webhook URL if provided */
-    if (strlen(webhook_url) > 0) {
-        nvs_config_set_webhook_url(webhook_url);
-        ESP_LOGI(TAG, "Webhook URL saved: %s", webhook_url);
+    if (strlen(server_addr) > 0) {
+        nvs_config_set_server(server_addr);
+        ESP_LOGI(TAG, "Server (IP:Port) saved: %s", server_addr);
     }
 
     httpd_resp_send(req, "Saved! Rebooting...", HTTPD_RESP_USE_STRLEN);

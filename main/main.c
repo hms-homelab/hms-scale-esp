@@ -74,10 +74,10 @@ void app_main(void)
     }
 
     /* 3. Load config from NVS */
-    char ssid[33] = {0}, pass[65] = {0}, webhook_url[256] = {0};
+    char ssid[33] = {0}, pass[65] = {0}, server[128] = {0};
     nvs_config_get_wifi(ssid, sizeof(ssid), pass, sizeof(pass));
-    if (!nvs_config_get_webhook_url(webhook_url, sizeof(webhook_url))) {
-        strncpy(webhook_url, CONFIG_DEFAULT_WEBHOOK_URL, sizeof(webhook_url) - 1);
+    if (!nvs_config_get_server(server, sizeof(server))) {
+        strncpy(server, CONFIG_DEFAULT_SERVER, sizeof(server) - 1);
     }
 
     /* 4. Connect WiFi */
@@ -91,7 +91,7 @@ void app_main(void)
     }
 
     /* 5. Init webhook */
-    webhook_init(webhook_url);
+    webhook_init(server);
 
     /* 6. Start station-mode config server */
     web_config_start();
@@ -134,7 +134,7 @@ void app_main(void)
         return;
     }
 
-    ESP_LOGI(TAG, "Giraffe Scale ready -- webhook: %s", webhook_url);
+    ESP_LOGI(TAG, "Giraffe Scale ready -- server: %s", server);
     ESP_LOGI(TAG, "Scanning for scale at MAC: %s", CONFIG_SCALE_MAC_ADDRESS);
 
     /* Main loop */

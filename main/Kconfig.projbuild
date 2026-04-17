@@ -6,11 +6,11 @@ config SCALE_MAC_ADDRESS
     help
         MAC address of the Etekcity BLE scale
 
-config DEFAULT_WEBHOOK_URL
-    string "Default Webhook URL"
-    default "http://hms-scale.local:8889/api/webhook/measurement"
+config DEFAULT_SERVER
+    string "Default Server (IP:Port)"
+    default "hms-scale.local:8889"
     help
-        Default URL for HTTP measurement webhook (configurable via captive portal)
+        Default hms-scale server address (configurable via captive portal)
 
 config USER_AGE
     int "User Age"

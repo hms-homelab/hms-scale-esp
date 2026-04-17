@@ -312,7 +312,11 @@ static void gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_
 // Parse the 22-byte scale data packet
 static void parse_scale_data(const uint8_t *data, size_t len) {
     if (len != 22) {
-        ESP_LOGW(TAG, "Invalid packet size: %zu (expected 22)", len);
+        char hex[128] = {0};
+        for (size_t i = 0; i < len && i < 40; i++) {
+            snprintf(hex + i * 3, 4, "%02X ", data[i]);
+        }
+        ESP_LOGW(TAG, "Unexpected packet (%zu bytes): %s", len, hex);
         return;
     }
 

@@ -17,7 +17,7 @@ static const char *TAG = "web_cfg";
 
 /* Cached state for the status page */
 static char s_wifi_ssid[33] = {0};
-static char s_webhook_url[256] = {0};
+static char s_server[256] = {0};
 static char s_last_weight[16] = "N/A";
 static char s_last_time[32] = "N/A";
 
@@ -117,12 +117,12 @@ static esp_err_t handle_status(httpd_req_t *req)
         "<div class='row'><span class='lbl'>BLE Scale</span>"
         "<span class='val %s'>%s</span></div>"
         "<div class='row'><span class='lbl'>Last Weight</span><span class='val'>%s</span></div>"
-        "<div class='row'><span class='lbl'>Webhook URL</span>"
+        "<div class='row'><span class='lbl'>Server</span>"
         "<span class='val' style='word-break:break-all;font-size:11px;'>%s</span></div>"
         "<form method='POST' action='/config'>"
-        "<label>Update Webhook URL</label>"
-        "<input type='text' name='webhook_url' value='%s'>"
-        "<button type='submit' class='btn-save'>Update Webhook</button>"
+        "<label>Update Server</label>"
+        "<input type='text' name='server' value='%s'>"
+        "<button type='submit' class='btn-save'>Update Server</button>"
         "</form>"
         "<form method='POST' action='/reset'>"
         "<button type='submit' class='btn-reset' "
@@ -135,8 +135,8 @@ static esp_err_t handle_status(httpd_req_t *req)
         ble_connected ? "on" : "off",
         ble_connected ? "Connected" : "Scanning...",
         s_last_weight,
-        s_webhook_url,
-        s_webhook_url);
+        s_server,
+        s_server);
 
     httpd_resp_set_type(req, "text/html");
     return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
@@ -152,14 +152,14 @@ static esp_err_t handle_config(httpd_req_t *req)
     }
     body[len] = 0;
 
-    char webhook_url[256] = {0};
-    parse_field(body, "webhook_url", webhook_url, sizeof(webhook_url));
+    char server[128] = {0};
+    parse_field(body, "server", server, sizeof(server));
 
-    if (strlen(webhook_url) > 0) {
-        nvs_config_set_webhook_url(webhook_url);
-        webhook_set_url(webhook_url);
-        strncpy(s_webhook_url, webhook_url, sizeof(s_webhook_url) - 1);
-        ESP_LOGI(TAG, "Webhook URL updated: %s", webhook_url);
+    if (strlen(server) > 0) {
+        nvs_config_set_server(server);
+        webhook_set_server(server);
+        strncpy(s_server, server, sizeof(s_server) - 1);
+        ESP_LOGI(TAG, "Server updated: %s", server);
     }
 
     /* Redirect back to status page */
@@ -192,8 +192,8 @@ esp_err_t web_config_start(void)
 {
     /* Cache current config for the status page */
     nvs_config_get_wifi(s_wifi_ssid, sizeof(s_wifi_ssid), (char[65]){0}, 65);
-    if (!nvs_config_get_webhook_url(s_webhook_url, sizeof(s_webhook_url))) {
-        strncpy(s_webhook_url, CONFIG_DEFAULT_WEBHOOK_URL, sizeof(s_webhook_url) - 1);
+    if (!nvs_config_get_server(s_server, sizeof(s_server))) {
+        strncpy(s_server, CONFIG_DEFAULT_SERVER, sizeof(s_server) - 1);
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();

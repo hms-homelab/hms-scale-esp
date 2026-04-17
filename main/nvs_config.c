@@ -51,23 +51,23 @@ void nvs_config_clear(void)
     ESP_LOGI(TAG, "All config cleared");
 }
 
-bool nvs_config_get_webhook_url(char *url, size_t url_len)
+bool nvs_config_get_server(char *server, size_t server_len)
 {
     nvs_handle_t h;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) return false;
-    esp_err_t err = nvs_get_str(h, "webhook", url, &url_len);
+    esp_err_t err = nvs_get_str(h, "server", server, &server_len);
     nvs_close(h);
     return err == ESP_OK;
 }
 
-esp_err_t nvs_config_set_webhook_url(const char *url)
+esp_err_t nvs_config_set_server(const char *server)
 {
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
     if (err != ESP_OK) return err;
-    nvs_set_str(h, "webhook", url);
+    nvs_set_str(h, "server", server);
     err = nvs_commit(h);
     nvs_close(h);
-    ESP_LOGI(TAG, "Webhook URL saved: %s", url);
+    ESP_LOGI(TAG, "Server saved: %s", server);
     return err;
 }
