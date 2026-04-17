@@ -1,0 +1,8 @@
+build/
+sdkconfig
+sdkconfig.old
+.vscode/
+.esphome/
+.cache/
+test_mqtt_config.sh
+MQTT_CONFIG_GUIDE.md

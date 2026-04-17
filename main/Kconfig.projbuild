@@ -1,0 +1,35 @@
+menu "Giraffe Scale Configuration"
+
+config SCALE_MAC_ADDRESS
+    string "Scale BLE MAC Address"
+    default "D0:4D:00:51:4F:8F"
+    help
+        MAC address of the Etekcity BLE scale
+
+config DEFAULT_WEBHOOK_URL
+    string "Default Webhook URL"
+    default "http://hms-scale.local:8889/api/webhook/measurement"
+    help
+        Default URL for HTTP measurement webhook (configurable via captive portal)
+
+config USER_AGE
+    int "User Age"
+    range 10 120
+    default 30
+    help
+        User age for body metrics calculations
+
+config USER_HEIGHT_CM
+    int "User Height (cm)"
+    range 100 250
+    default 175
+    help
+        User height in centimeters
+
+config USER_SEX_MALE
+    bool "User Sex is Male"
+    default y
+    help
+        Select if user is male (deselect for female)
+
+endmenu
