@@ -6,7 +6,6 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "esp_wifi.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 
@@ -101,7 +100,6 @@ void app_main(void)
         total_waited_ms += backoff_ms;
         ESP_LOGW(TAG, "WiFi failed, retrying in %lu ms (total waited: %lu ms)",
                  (unsigned long)backoff_ms, (unsigned long)total_waited_ms);
-        esp_wifi_stop();
         vTaskDelay(pdMS_TO_TICKS(backoff_ms));
         total_waited_ms += backoff_ms;
         backoff_ms = backoff_ms * 2;

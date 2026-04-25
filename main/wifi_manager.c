@@ -79,6 +79,7 @@ esp_err_t wifi_manager_connect(const char *ssid, const char *password)
     strncpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
+    esp_wifi_stop();
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
