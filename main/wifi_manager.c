@@ -97,7 +97,7 @@ esp_err_t wifi_manager_wait_connected(uint32_t timeout_ms)
 {
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                                             WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                            pdFALSE, pdFALSE,
+                                            pdTRUE, pdFALSE,
                                             pdMS_TO_TICKS(timeout_ms));
 
     if (bits & WIFI_CONNECTED_BIT) {

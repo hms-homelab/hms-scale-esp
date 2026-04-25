@@ -3,6 +3,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -21,36 +22,57 @@ static const char *TAG = "main";
 /* Forward declaration for web_config last-measurement update */
 extern void web_config_set_last_measurement(float weight_kg);
 
-/* Scale measurement callback */
+/* Measurement queue — BLE callback enqueues, webhook task dequeues */
+typedef struct {
+    scale_measurement_t measurement;
+    body_metrics_t metrics;
+} queued_measurement_t;
+
+static QueueHandle_t s_measurement_queue = NULL;
+
+/* Webhook task — runs HTTP POSTs off the BLE callback stack */
+static void webhook_task(void *arg)
+{
+    queued_measurement_t item;
+    while (1) {
+        if (xQueueReceive(s_measurement_queue, &item, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+
+        ESP_LOGI(TAG, "Giraffe Scale Measurement:");
+        ESP_LOGI(TAG, "  Weight: %.2f kg (%.2f lb)",
+                 item.measurement.weight_kg, item.measurement.weight_kg * 2.20462);
+        ESP_LOGI(TAG, "  Impedance: %d ohm", item.measurement.impedance_ohms);
+        ESP_LOGI(TAG, "  Battery: %d%%", item.measurement.battery_pct);
+        ESP_LOGI(TAG, "  BMI: %.1f | Body Fat: %.1f%% | Muscle: %.1f kg",
+                 item.metrics.bmi, item.metrics.body_fat_pct, item.metrics.muscle_mass_kg);
+
+        web_config_set_last_measurement(item.measurement.weight_kg);
+
+        webhook_response_t response = {0};
+        esp_err_t ret = webhook_post_measurement(&item.measurement, &response);
+        if (ret == ESP_OK) {
+            if (response.identified) {
+                ESP_LOGI(TAG, "  -> Identified as %s (%.1f%% confidence)",
+                         response.user_name, response.confidence);
+            } else {
+                ESP_LOGI(TAG, "  -> User not identified (unassigned)");
+            }
+        } else {
+            ESP_LOGE(TAG, "  -> Webhook POST failed after retries");
+        }
+    }
+}
+
+/* BLE callback — enqueues measurement, returns immediately */
 static void scale_measurement_handler(const scale_measurement_t *measurement, const body_metrics_t *metrics)
 {
-    ESP_LOGI(TAG, "Giraffe Scale Measurement:");
-    ESP_LOGI(TAG, "  Weight: %.2f kg (%.2f lb)",
-             measurement->weight_kg, measurement->weight_kg * 2.20462);
-    ESP_LOGI(TAG, "  Impedance: %d ohm", measurement->impedance_ohms);
-    ESP_LOGI(TAG, "  Battery: %d%%", measurement->battery_pct);
-    ESP_LOGI(TAG, "  BMI: %.1f | Body Fat: %.1f%% | Muscle: %.1f kg",
-             metrics->bmi, metrics->body_fat_pct, metrics->muscle_mass_kg);
-    ESP_LOGI(TAG, "  Body Water: %.1f%% | Bone: %.2f kg | Protein: %.1f%%",
-             metrics->body_water_pct, metrics->bone_mass_kg, metrics->protein_pct);
-    ESP_LOGI(TAG, "  Visceral Fat: %.1f | Metabolic Age: %d years | BMR: %.0f kcal/day",
-             metrics->visceral_fat, metrics->metabolic_age, metrics->bmr_kcal);
+    queued_measurement_t item;
+    memcpy(&item.measurement, measurement, sizeof(*measurement));
+    memcpy(&item.metrics, metrics, sizeof(*metrics));
 
-    /* Update web config status page */
-    web_config_set_last_measurement(measurement->weight_kg);
-
-    /* Send to hms-scale via webhook (replaces MQTT publish) */
-    webhook_response_t response = {0};
-    esp_err_t ret = webhook_post_measurement(measurement, &response);
-    if (ret == ESP_OK) {
-        if (response.identified) {
-            ESP_LOGI(TAG, "  -> Identified as %s (%.1f%% confidence)",
-                     response.user_name, response.confidence);
-        } else {
-            ESP_LOGI(TAG, "  -> User not identified (unassigned)");
-        }
-    } else {
-        ESP_LOGE(TAG, "  -> Webhook POST failed after retries");
+    if (xQueueSend(s_measurement_queue, &item, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "Measurement queue full, dropping");
     }
 }
 
@@ -114,8 +136,10 @@ void app_main(void)
         return;
     }
 
-    /* 5. Init webhook */
+    /* 5. Init webhook + measurement queue */
     webhook_init(server);
+    s_measurement_queue = xQueueCreate(4, sizeof(queued_measurement_t));
+    xTaskCreate(webhook_task, "webhook", 4096, NULL, 5, NULL);
 
     /* 6. Start station-mode config server */
     web_config_start();

@@ -9,6 +9,7 @@
 #include "esp_gatt_common_api.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 
@@ -31,8 +32,15 @@ static uint16_t g_service_start_handle = 0;
 static uint16_t g_service_end_handle = 0;
 
 // Connection state
-static bool g_connected = false;
-static bool g_scanning = false;
+static volatile bool g_connected = false;
+static volatile bool g_scanning = false;
+
+// Deferred scan restart (avoids blocking BT host task)
+static esp_timer_handle_t g_rescan_timer = NULL;
+
+static void rescan_timer_cb(void *arg) {
+    esp_ble_gap_start_scanning(0);
+}
 
 // User callback
 static scale_measurement_callback_t g_measurement_cb = NULL;
@@ -293,15 +301,13 @@ static void gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_
         break;
 
     case ESP_GATTC_DISCONNECT_EVT:
-        ESP_LOGI(TAG, "⏸️  Disconnected from scale");
+        ESP_LOGI(TAG, "Disconnected from scale");
         g_connected = false;
         g_conn_id = 0;
         g_notify_handle = 0;
         g_cccd_handle = 0;
 
-        // Resume scanning after 2 seconds
-        vTaskDelay(pdMS_TO_TICKS(2000));
-        esp_ble_gap_start_scanning(0);
+        esp_timer_start_once(g_rescan_timer, 2000000);
         break;
 
     default:
@@ -570,6 +576,13 @@ esp_err_t scale_ble_init(const char *mac_address, scale_measurement_callback_t c
 
     // Load user profile from NVS (or use Kconfig defaults)
     load_user_profile_from_nvs();
+
+    // Create rescan timer (deferred scan restart after disconnect)
+    esp_timer_create_args_t timer_args = {
+        .callback = rescan_timer_cb,
+        .name = "rescan",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &g_rescan_timer));
 
     // Register GATT client
     esp_err_t ret = esp_ble_gattc_register_callback(gattc_event_handler);

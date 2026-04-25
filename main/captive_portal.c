@@ -207,6 +207,10 @@ static esp_err_t handle_scan(httpd_req_t *req)
     uint16_t num = 0;
     esp_wifi_scan_start(NULL, true);
     esp_wifi_scan_get_ap_num(&num);
+    if (num == 0) {
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_send(req, "[]", 2);
+    }
     if (num > 20) num = 20;
 
     wifi_ap_record_t *aps = calloc(num, sizeof(wifi_ap_record_t));
