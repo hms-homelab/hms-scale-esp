@@ -33,11 +33,17 @@ esp_err_t nvs_config_set_wifi(const char *ssid, const char *pass)
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
     if (err != ESP_OK) return err;
-    nvs_set_str(h, "ssid", ssid);
-    nvs_set_str(h, "pass", pass);
+    err = nvs_set_str(h, "ssid", ssid);
+    if (err != ESP_OK) { nvs_close(h); return err; }
+    err = nvs_set_str(h, "pass", pass);
+    if (err != ESP_OK) { nvs_close(h); return err; }
     err = nvs_commit(h);
     nvs_close(h);
-    ESP_LOGI(TAG, "WiFi credentials saved for SSID: %s", ssid);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi credentials saved for SSID: %s", ssid);
+    } else {
+        ESP_LOGE(TAG, "NVS commit failed: %s", esp_err_to_name(err));
+    }
     return err;
 }
 
@@ -65,9 +71,14 @@ esp_err_t nvs_config_set_server(const char *server)
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
     if (err != ESP_OK) return err;
-    nvs_set_str(h, "server", server);
+    err = nvs_set_str(h, "server", server);
+    if (err != ESP_OK) { nvs_close(h); return err; }
     err = nvs_commit(h);
     nvs_close(h);
-    ESP_LOGI(TAG, "Server saved: %s", server);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Server saved: %s", server);
+    } else {
+        ESP_LOGE(TAG, "NVS commit failed: %s", esp_err_to_name(err));
+    }
     return err;
 }

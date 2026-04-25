@@ -6,6 +6,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_wifi.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 
@@ -58,13 +59,13 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Giraffe Scale v2.0.0 starting...");
 
-    /* 1. Init NVS */
+    /* 1. Init NVS — erase and retry on any init failure */
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "NVS init failed (%s), erasing and retrying", esp_err_to_name(ret));
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
     }
-    ESP_ERROR_CHECK(ret);
 
     /* 2. Check for WiFi config */
     if (!nvs_config_has_wifi()) {
@@ -80,12 +81,37 @@ void app_main(void)
         strncpy(server, CONFIG_DEFAULT_SERVER, sizeof(server) - 1);
     }
 
-    /* 4. Connect WiFi */
+    /* 4. Connect WiFi with exponential backoff (up to ~1 hour before captive portal) */
     wifi_manager_init();
-    wifi_manager_connect(ssid, pass);
-    if (wifi_manager_wait_connected(30000) != ESP_OK) {
-        ESP_LOGE(TAG, "WiFi connection failed -- starting captive portal");
+
+    uint32_t backoff_ms = 30000;
+    const uint32_t max_backoff_ms = 300000;
+    uint32_t total_waited_ms = 0;
+    const uint32_t give_up_ms = 3600000;
+
+    while (total_waited_ms < give_up_ms) {
+        wifi_manager_connect(ssid, pass);
+        if (wifi_manager_wait_connected(backoff_ms) == ESP_OK) {
+            break;
+        }
+        if (wifi_manager_is_auth_failure()) {
+            ESP_LOGE(TAG, "WiFi auth failure -- wrong password, going straight to captive portal");
+            break;
+        }
+        total_waited_ms += backoff_ms;
+        ESP_LOGW(TAG, "WiFi failed, retrying in %lu ms (total waited: %lu ms)",
+                 (unsigned long)backoff_ms, (unsigned long)total_waited_ms);
+        esp_wifi_stop();
+        vTaskDelay(pdMS_TO_TICKS(backoff_ms));
+        total_waited_ms += backoff_ms;
+        backoff_ms = backoff_ms * 2;
+        if (backoff_ms > max_backoff_ms) backoff_ms = max_backoff_ms;
+    }
+
+    if (!wifi_manager_is_connected()) {
+        ESP_LOGE(TAG, "WiFi failed -- clearing config and rebooting to captive portal");
         nvs_config_clear();
+        vTaskDelay(pdMS_TO_TICKS(500));
         esp_restart();
         return;
     }

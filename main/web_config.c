@@ -181,7 +181,7 @@ static esp_err_t handle_reset(httpd_req_t *req)
         "</style></head><body><p>WiFi cleared. Rebooting to captive portal...</p></body></html>",
         HTTPD_RESP_USE_STRLEN);
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(1500));
     esp_restart();
     return ESP_OK;
 }

@@ -263,7 +263,7 @@ static esp_err_t handle_save(httpd_req_t *req)
         vTaskDelete(s_dns_task);
         s_dns_task = NULL;
     }
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(1500));
     esp_restart();
     return ESP_OK;
 }

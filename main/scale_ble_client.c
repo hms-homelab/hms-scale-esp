@@ -536,24 +536,18 @@ static esp_err_t save_user_profile_to_nvs(void) {
         return err;
     }
 
-    // Save age
     err = nvs_set_i32(nvs_handle, NVS_KEY_AGE, g_user_age);
-    if (err != ESP_OK) goto cleanup;
+    if (err != ESP_OK) { ESP_LOGE(TAG, "NVS write age failed: %s", esp_err_to_name(err)); goto cleanup; }
 
-    // Save height (as integer cm)
     err = nvs_set_i32(nvs_handle, NVS_KEY_HEIGHT, (int32_t)g_user_height_cm);
-    if (err != ESP_OK) goto cleanup;
+    if (err != ESP_OK) { ESP_LOGE(TAG, "NVS write height failed: %s", esp_err_to_name(err)); goto cleanup; }
 
-    // Save sex
     err = nvs_set_u8(nvs_handle, NVS_KEY_SEX, g_user_is_male ? 1 : 0);
-    if (err != ESP_OK) goto cleanup;
+    if (err != ESP_OK) { ESP_LOGE(TAG, "NVS write sex failed: %s", esp_err_to_name(err)); goto cleanup; }
 
-    // Commit changes
     err = nvs_commit(nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "NVS commit failed: %s", esp_err_to_name(err));
-    } else {
-        ESP_LOGI(TAG, "💾 User profile saved to NVS");
     }
 
 cleanup:

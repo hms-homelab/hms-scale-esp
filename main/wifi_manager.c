@@ -17,6 +17,7 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_count = 0;
 static bool s_connected = false;
 static bool s_initialized = false;
+static bool s_auth_failure = false;
 
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
@@ -24,11 +25,18 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t *disc = (wifi_event_sta_disconnected_t *)event_data;
         s_connected = false;
-        if (s_retry_count < WIFI_MAX_RETRY) {
+        if (disc->reason == WIFI_REASON_AUTH_FAIL ||
+            disc->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT ||
+            disc->reason == WIFI_REASON_HANDSHAKE_TIMEOUT) {
+            s_auth_failure = true;
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            ESP_LOGE(TAG, "Auth failure (reason %d) -- wrong password or rejected", disc->reason);
+        } else if (s_retry_count < WIFI_MAX_RETRY) {
             esp_wifi_connect();
             s_retry_count++;
-            ESP_LOGW(TAG, "Retry %d/%d", s_retry_count, WIFI_MAX_RETRY);
+            ESP_LOGW(TAG, "Retry %d/%d (reason %d)", s_retry_count, WIFI_MAX_RETRY, disc->reason);
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
             ESP_LOGE(TAG, "Connection failed after %d retries", WIFI_MAX_RETRY);
@@ -75,6 +83,7 @@ esp_err_t wifi_manager_connect(const char *ssid, const char *password)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
     s_retry_count = 0;
+    s_auth_failure = false;
     xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
 
     ESP_LOGI(TAG, "Connecting to %s...", ssid);
@@ -101,6 +110,11 @@ esp_err_t wifi_manager_wait_connected(uint32_t timeout_ms)
 bool wifi_manager_is_connected(void)
 {
     return s_connected;
+}
+
+bool wifi_manager_is_auth_failure(void)
+{
+    return s_auth_failure;
 }
 
 esp_err_t wifi_manager_scan(wifi_ap_record_t *results, uint16_t *count, uint16_t max_count)
