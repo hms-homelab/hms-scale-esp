@@ -128,9 +128,14 @@ void app_main(void)
     }
 
     if (!wifi_manager_is_connected()) {
-        ESP_LOGE(TAG, "WiFi failed -- clearing config and rebooting to captive portal");
-        nvs_config_clear();
-        vTaskDelay(pdMS_TO_TICKS(500));
+        if (wifi_manager_is_auth_failure()) {
+            ESP_LOGE(TAG, "Auth failure -- clearing config and rebooting to captive portal");
+            nvs_config_clear();
+            vTaskDelay(pdMS_TO_TICKS(500));
+        } else {
+            ESP_LOGW(TAG, "WiFi timeout -- rebooting to retry with saved config");
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
         esp_restart();
         return;
     }
