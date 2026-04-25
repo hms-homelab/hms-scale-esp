@@ -78,7 +78,7 @@ static void scale_measurement_handler(const scale_measurement_t *measurement, co
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Giraffe Scale v2.0.0 starting...");
+    ESP_LOGI(TAG, "Giraffe Scale v2.0.1 starting...");
 
     /* 1. Init NVS — erase and retry on any init failure */
     esp_err_t ret = nvs_flash_init();

@@ -89,6 +89,7 @@ esp_err_t wifi_manager_connect(const char *ssid, const char *password)
 
     ESP_LOGI(TAG, "Connecting to %s...", ssid);
     ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_set_max_tx_power(44);
 
     return ESP_OK;
 }

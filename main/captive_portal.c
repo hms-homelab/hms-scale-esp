@@ -306,6 +306,7 @@ void captive_portal_start(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_set_max_tx_power(44);
 
     /* Start DNS hijack */
     xTaskCreate(dns_server_task, "dns_hijack", 4096, NULL, 5, &s_dns_task);
