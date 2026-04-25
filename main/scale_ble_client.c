@@ -306,7 +306,10 @@ static void gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_
         g_conn_id = 0;
         g_notify_handle = 0;
         g_cccd_handle = 0;
+        g_service_start_handle = 0;
+        g_service_end_handle = 0;
 
+        esp_timer_stop(g_rescan_timer);
         esp_timer_start_once(g_rescan_timer, 2000000);
         break;
 

@@ -119,7 +119,6 @@ void app_main(void)
             ESP_LOGE(TAG, "WiFi auth failure -- wrong password, going straight to captive portal");
             break;
         }
-        total_waited_ms += backoff_ms;
         ESP_LOGW(TAG, "WiFi failed, retrying in %lu ms (total waited: %lu ms)",
                  (unsigned long)backoff_ms, (unsigned long)total_waited_ms);
         vTaskDelay(pdMS_TO_TICKS(backoff_ms));
