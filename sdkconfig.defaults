@@ -27,3 +27,8 @@ CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# Phone browsers send header sets well past the 512-byte default, which makes
+# esp_http_server answer 431 "Header fields are too long" — on the captive
+# portal too, where it would block onboarding. hms-esp-apc already uses 2048.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048

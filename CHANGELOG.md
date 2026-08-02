@@ -7,6 +7,25 @@ which is the single source of truth — the boot banner, the web UI and the mDNS
 TXT record all read it from there. This file is the only place a version number
 is written out separately.
 
+## v2.0.4
+
+### Changed
+- **The captive portal now verifies the Wi-Fi join before saving anything**
+  (SDD-015, ported from cpapdash-push-c3). `POST /save` holds the credentials
+  in RAM and attempts the join in APSTA with the setup AP still up. They are
+  written to NVS only once the join has proved good, so NVS never holds
+  credentials that do not work. On failure the portal stays up, reports why
+  (network not found / wrong password / no IP / association failure) and
+  accepts another attempt, with no reboot in between.
+
+  Previously `/save` wrote NVS and rebooted blind. A mistyped password cost two
+  reboots and dropped the user back on the portal with no explanation, because
+  the auth-failure path in `main.c` wiped the bad credentials on the far side.
+
+  In-session retries are safe on this board: BLE is only started in `app_main`
+  after Wi-Fi connects, so there is no Wi-Fi + BLE coexistence heap pressure
+  during onboarding.
+
 ## v2.0.3
 
 ### Fixed
