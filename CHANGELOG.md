@@ -7,6 +7,21 @@ which is the single source of truth — the boot banner, the web UI and the mDNS
 TXT record all read it from there. This file is the only place a version number
 is written out separately.
 
+## [2.0.3]
+
+### Fixed
+- **OTA rebooted the device mid-upload.** `esp_ota_begin()` was passed
+  `OTA_SIZE_UNKNOWN`, which erases the ENTIRE partition — `ota_0` is 0x1E0000
+  (1.875 MB), and erasing more than ~1280 K takes over 5 s, tripping the default
+  task watchdog (espressif/esp-idf#578). It does not look like a watchdog reset
+  from the client side: the client keeps filling TCP buffers while the device is
+  blocked in the erase, so the upload appears to stall around 130 KB after ~20 s.
+  Now passes the real `req->content_len`, so only the needed sectors are erased.
+  The OTA path shipped in 2.0.2 could not complete an upload; **2.0.3 must be
+  flashed over USB**, since the broken OTA cannot deliver its own fix.
+- OTA receive buffer is now 4 KB (one flash sector) instead of 2 KB, matching
+  the proven cpapdash-push-c3 loop.
+
 ## [2.0.2]
 
 ### Added
