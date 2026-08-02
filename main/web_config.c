@@ -2,11 +2,14 @@
 #include "nvs_config.h"
 #include "http_webhook.h"
 #include "scale_ble_client.h"
+#include "version.h"
 #include "esp_http_server.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -75,6 +78,82 @@ static bool parse_field(char *body, const char *name, char *out, size_t out_size
 
 /* ── HTTP handlers ── */
 
+static esp_err_t handle_ota(httpd_req_t *req)
+{
+    const esp_partition_t *update = esp_ota_get_next_update_partition(NULL);
+    if (update == NULL) {
+        ESP_LOGE(TAG, "OTA: no update partition");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "OTA: writing to '%s', size %lu, incoming %d bytes",
+             update->label, (unsigned long)update->size, req->content_len);
+
+    if (req->content_len <= 0 || (size_t)req->content_len > update->size) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad image size");
+        return ESP_FAIL;
+    }
+
+    esp_ota_handle_t ota = 0;
+    esp_err_t err = esp_ota_begin(update, OTA_SIZE_UNKNOWN, &ota);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "OTA: esp_ota_begin failed: %s", esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "ota_begin failed");
+        return ESP_FAIL;
+    }
+
+    char *buf = malloc(2048);
+    if (!buf) {
+        esp_ota_abort(ota);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    int remaining = req->content_len;
+    while (remaining > 0) {
+        int r = httpd_req_recv(req, buf, remaining < 2048 ? remaining : 2048);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (r <= 0) {
+            ESP_LOGE(TAG, "OTA: recv error (%d), %d bytes left", r, remaining);
+            free(buf);
+            esp_ota_abort(ota);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Receive error");
+            return ESP_FAIL;
+        }
+        if (esp_ota_write(ota, buf, r) != ESP_OK) {
+            free(buf);
+            esp_ota_abort(ota);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "ota_write failed");
+            return ESP_FAIL;
+        }
+        remaining -= r;
+    }
+    free(buf);
+
+    err = esp_ota_end(ota);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "OTA: esp_ota_end failed: %s", esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid image");
+        return ESP_FAIL;
+    }
+
+    err = esp_ota_set_boot_partition(update);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "OTA: set_boot_partition failed: %s", esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "set_boot failed");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "OTA: success, booting '%s' on restart", update->label);
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, "OK, firmware flashed. Rebooting...");
+
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
+    return ESP_OK;
+}
+
 static esp_err_t handle_status(httpd_req_t *req)
 {
     /* Get IP address */
@@ -89,7 +168,7 @@ static esp_err_t handle_status(httpd_req_t *req)
 
     bool ble_connected = scale_ble_is_connected();
 
-    char html[4096];
+    char html[6144];
     snprintf(html, sizeof(html),
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -104,14 +183,18 @@ static esp_err_t handle_status(httpd_req_t *req)
         "label{display:block;color:#888;font-size:12px;margin:16px 0 4px;}"
         "input[type=text]{width:100%%;padding:10px;background:#252840;border:1px solid #333;"
         "border-radius:8px;color:#E0E0E0;font-size:14px;box-sizing:border-box;}"
+        "input[type=file]{display:block;margin:12px 0;color:#E0E0E0;}"
         "button{padding:10px 16px;border:none;border-radius:8px;font-size:14px;"
         "font-weight:600;cursor:pointer;margin-top:12px;}"
         ".btn-save{background:#667EEA;color:#fff;width:100%%;}"
+        ".btn-update{background:#8B5CF6;color:#fff;width:100%%;}"
         ".btn-reset{background:#EF4444;color:#fff;width:100%%;margin-top:8px;}"
         ".status{color:#4ADE80;font-size:13px;margin-top:8px;text-align:center;}"
+        ".hr{border:0;border-top:1px solid #252840;margin:16px 0;}"
         "</style></head><body>"
         "<div class='card'>"
         "<h1>Giraffe Scale</h1>"
+        "<div class='row'><span class='lbl'>Firmware</span><span class='val'>%s</span></div>"
         "<div class='row'><span class='lbl'>WiFi SSID</span><span class='val'>%s</span></div>"
         "<div class='row'><span class='lbl'>IP Address</span><span class='val'>%s</span></div>"
         "<div class='row'><span class='lbl'>BLE Scale</span>"
@@ -124,12 +207,24 @@ static esp_err_t handle_status(httpd_req_t *req)
         "<input type='text' name='server' value='%s'>"
         "<button type='submit' class='btn-save'>Update Server</button>"
         "</form>"
+        "<div class='hr'></div>"
+        "<label>Firmware Update</label>"
+        "<input type='file' id='fw' accept='.bin'>"
+        "<button type='button' class='btn-update' onclick='upload()'>Upload & Reboot</button>"
+        "<script>"
+        "function upload(){var f=document.getElementById('fw').files[0];if(!f){alert('Select a .bin file');return;}"
+        "var s=document.getElementById('st');s.textContent='Uploading...';var fd=new FormData();fd.append('file',f);"
+        "fetch('/ota',{method:'POST',body:f}).then(function(r){return r.text().then(function(t){"
+        "return {ok:r.ok,t:t};});}).then(function(o){s.textContent=o.ok?(o.t+' Rebooting...'):'Failed: '+o.t;})"
+        ".catch(function(e){s.textContent='Upload failed: '+e;});}"
+        "</script>"
         "<form method='POST' action='/reset'>"
         "<button type='submit' class='btn-reset' "
         "onclick=\"return confirm('Reset WiFi and reboot?')\">Reset WiFi</button>"
         "</form>"
         "<div class='status' id='st'></div>"
         "</div></body></html>",
+        HMS_SCALE_ESP_VERSION,
         s_wifi_ssid,
         ip_str,
         ble_connected ? "on" : "off",
@@ -198,7 +293,7 @@ esp_err_t web_config_start(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.stack_size = 8192;
-    config.max_uri_handlers = 6;
+    config.max_uri_handlers = 8;
 
     httpd_handle_t server = NULL;
     esp_err_t err = httpd_start(&server, &config);
@@ -210,10 +305,12 @@ esp_err_t web_config_start(void)
     httpd_uri_t uri_status = { .uri = "/",       .method = HTTP_GET,  .handler = handle_status };
     httpd_uri_t uri_config = { .uri = "/config",  .method = HTTP_POST, .handler = handle_config };
     httpd_uri_t uri_reset  = { .uri = "/reset",   .method = HTTP_POST, .handler = handle_reset };
+    httpd_uri_t uri_ota    = { .uri = "/ota",     .method = HTTP_POST, .handler = handle_ota };
 
     httpd_register_uri_handler(server, &uri_status);
     httpd_register_uri_handler(server, &uri_config);
     httpd_register_uri_handler(server, &uri_reset);
+    httpd_register_uri_handler(server, &uri_ota);
 
     ESP_LOGI(TAG, "Config web server started on port 80");
     return ESP_OK;
