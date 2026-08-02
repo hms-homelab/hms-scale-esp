@@ -9,6 +9,9 @@
 #include "nvs_flash.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
+#include "mdns.h"
+
+#include "version.h"
 
 #include "scale_ble_client.h"
 #include "nvs_config.h"
@@ -78,7 +81,7 @@ static void scale_measurement_handler(const scale_measurement_t *measurement, co
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Giraffe Scale v2.0.1 starting...");
+    ESP_LOGI(TAG, "Giraffe Scale v%s starting...", HMS_SCALE_ESP_VERSION);
 
     /* 1. Init NVS — erase and retry on any init failure */
     esp_err_t ret = nvs_flash_init();
@@ -147,6 +150,22 @@ void app_main(void)
 
     /* 6. Start station-mode config server */
     web_config_start();
+
+    /* 6b. mDNS — reached only after GOT_IP, since wifi_manager_wait_connected()
+     * returns on the bit set by IP_EVENT_STA_GOT_IP. Advertises the config UI
+     * as giraffe-scale.local so the board is reachable without a router lookup. */
+    if (mdns_init() == ESP_OK) {
+        mdns_hostname_set("giraffe-scale");
+        mdns_instance_name_set("Giraffe Scale");
+        mdns_txt_item_t txt[] = {
+            { "fw",     HMS_SCALE_ESP_VERSION },
+            { "device", "giraffe-scale" },
+        };
+        mdns_service_add(NULL, "_http", "_tcp", 80, txt, 2);
+        ESP_LOGI(TAG, "mDNS: giraffe-scale.local + _http._tcp on port 80");
+    } else {
+        ESP_LOGW(TAG, "mDNS init failed -- reach the UI by IP instead");
+    }
 
     /* 7. Init Bluetooth */
     ESP_LOGI(TAG, "Initializing Bluetooth...");
