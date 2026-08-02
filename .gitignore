@@ -8,3 +8,4 @@ dependencies.lock
 .cache/
 test_mqtt_config.sh
 MQTT_CONFIG_GUIDE.md
+dist/

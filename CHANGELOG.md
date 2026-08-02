@@ -7,7 +7,7 @@ which is the single source of truth — the boot banner, the web UI and the mDNS
 TXT record all read it from there. This file is the only place a version number
 is written out separately.
 
-## [2.0.3]
+## v2.0.3
 
 ### Fixed
 - **OTA rebooted the device mid-upload.** `esp_ota_begin()` was passed
@@ -22,7 +22,7 @@ is written out separately.
 - OTA receive buffer is now 4 KB (one flash sector) instead of 2 KB, matching
   the proven cpapdash-push-c3 loop.
 
-## [2.0.2]
+## v2.0.2
 
 ### Added
 - OTA firmware updates over HTTP. `POST /ota` streams the image into the
@@ -42,11 +42,11 @@ is written out separately.
 - The boot banner printed a hardcoded `v2.0.1` regardless of the actual build.
   It now reads `HMS_SCALE_ESP_VERSION`.
 
-## [2.0.1]
+## v2.0.1
 
 - Only clear NVS on WiFi auth failure, not on transient WiFi drops.
 
-## [2.0.0]
+## v2.0.0
 
 - BLE blocking, stack overflow and race fixes from the QA audit: webhook POSTs
   moved off the BLE callback onto a queue + dedicated task, `esp_timer` instead
@@ -54,7 +54,7 @@ is written out separately.
 - NVS corruption fixes: checked `nvs_set_*` return values, delay before
   `esp_restart()`, 24 KB NVS partition, exponential WiFi backoff.
 
-## [1.0.0]
+## v1.0.0
 
 - Initial release: Etekcity scale BLE GATT client, HTTP webhook, captive
   portal with DNS hijack, NVS config.
