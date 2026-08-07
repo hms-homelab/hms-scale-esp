@@ -7,6 +7,29 @@ which is the single source of truth — the boot banner, the web UI and the mDNS
 TXT record all read it from there. This file is the only place a version number
 is written out separately.
 
+## v2.0.5
+
+### Added
+- **Builds for the ESP32-S3 as well as the C3.** None of the firmware itself was
+  chip-specific, so only the build configuration changed: `sdkconfig.defaults`
+  now holds the settings both chips share and no longer names a target, with
+  `sdkconfig.defaults.esp32c3` and `sdkconfig.defaults.esp32s3` layered on top
+  by ESP-IDF according to whichever target is set. Both chips are 4MB, so the
+  dual-OTA `partitions.csv` is unchanged and OTA works the same on either.
+- The S3 file exists almost entirely for one setting. An S3 Super Mini exposes
+  only its native USB-Serial-JTAG and has no USB-UART bridge on UART0, so on
+  IDF's default console it boots, runs, and prints nothing at all — which reads
+  as a dead board. `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y` is what makes it
+  speak. Verified on hardware: an S3 Super Mini flashed with this build boots,
+  runs the captive portal, joins Wi-Fi, answers at `giraffe-scale.local` and
+  brings up the BLE client.
+
+### Changed
+- `idf.py set-target <chip>` is now required before building, since the target
+  no longer comes from `sdkconfig.defaults`. Switching targets rewrites
+  `sdkconfig` and wipes `build/`, so re-run it when moving between boards.
+- Release binaries are still C3 builds; S3 images are built locally.
+
 ## v2.0.4
 
 ### Changed

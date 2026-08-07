@@ -44,10 +44,25 @@ hms-scale (C++ service)
 # Set up ESP-IDF v5.3+
 . ~/esp/esp-idf/export.sh
 
-# Build
+# Build for the C3 Super Mini (the original board)
 idf.py set-target esp32c3
 idf.py build
+
+# ...or for an S3 Super Mini
+idf.py set-target esp32s3
+idf.py build
 ```
+
+`set-target` is not optional: `sdkconfig.defaults` holds only the settings both
+chips share, and each chip's own file (`sdkconfig.defaults.esp32c3`,
+`sdkconfig.defaults.esp32s3`) is layered on top by target name. The S3 file is
+what moves the console onto USB-Serial-JTAG -- without it an S3 Super Mini runs
+fine but prints nothing, since it has no USB-UART bridge on UART0.
+
+Switching targets rewrites `sdkconfig` and wipes `build/`, so run `set-target`
+again when you move between boards. Both chips are 4MB, so the dual-OTA
+`partitions.csv` is the same either way. Releases published by CI are C3 builds;
+build S3 images locally.
 
 ### 2. Flash
 
@@ -113,7 +128,7 @@ Runtime options (stored in NVS, configured via captive portal or web UI):
 
 ## Hardware
 
-- **MCU:** ESP32-C3 Super Mini
+- **MCU:** ESP32-C3 Super Mini, or ESP32-S3 Super Mini (both 4MB)
 - **Scale:** Etekcity ESF-551 Smart Fitness Scale
 - **BLE:** Bluedroid stack, GATT client
 - **Sensors:** Load cell (weight in grams), BIA (impedance in ohms)

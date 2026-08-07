@@ -1,0 +1,9 @@
+# ESP32-C3 Super Mini. Layered on top of sdkconfig.defaults by ESP-IDF when the
+# target is esp32c3. This is the original board the firmware shipped on.
+CONFIG_IDF_TARGET="esp32c3"
+CONFIG_IDF_TARGET_ESP32C3=y
+
+# Console on UART0, with USB-Serial-JTAG kept as the secondary output. This is
+# the IDF default for the C3 and is spelled out only so the contrast with the
+# S3 file is visible: there the primary MUST move to USB-Serial-JTAG.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y

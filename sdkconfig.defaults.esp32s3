@@ -1,0 +1,21 @@
+# ESP32-S3 Super Mini. Layered on top of sdkconfig.defaults by ESP-IDF when the
+# target is esp32s3. Bench board: QFN56 rev v0.2, 4MB embedded flash (quad per
+# eFuse), 2MB PSRAM, native USB only.
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_IDF_TARGET_ESP32S3=y
+
+# *** THE ONE SETTING THAT MATTERS ON THIS BOARD ***
+# The S3 Super Mini brings out only its native USB-Serial-JTAG; there is no
+# USB-UART bridge wired to UART0. Leaving the IDF default (console on UART0)
+# gives a board that boots and runs but prints absolutely nothing, which reads
+# as a dead board. Move the primary console onto USB-Serial-JTAG.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=n
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# PSRAM is deliberately left disabled. The 2MB is present but this firmware is
+# a BLE client plus a small HTTP server and does not need it; enabling it only
+# adds boot-time init and a class of cache-alignment issues to debug.
+
+# Flash size, flash mode/freq and the dual-OTA partitions.csv all carry over
+# from sdkconfig.defaults unchanged: this board is 4MB like the C3, so the
+# 0x20000 / 0x200000 OTA layout fits as-is.

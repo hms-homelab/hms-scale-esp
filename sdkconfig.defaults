@@ -1,6 +1,9 @@
-# ESP32-C3 Configuration
-CONFIG_IDF_TARGET="esp32c3"
-CONFIG_IDF_TARGET_ESP32C3=y
+# Settings shared by every supported chip. The target itself is NOT set here:
+# it comes from `idf.py set-target <chip>`, and ESP-IDF then layers the matching
+# sdkconfig.defaults.<target> on top of this file. Anything chip-specific
+# (console routing, above all) belongs in that file, not this one.
+#
+# Supported targets: esp32c3 (Super Mini, the original board), esp32s3.
 
 # Bluetooth Configuration
 CONFIG_BT_ENABLED=y
